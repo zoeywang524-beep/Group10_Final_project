@@ -1,3 +1,9 @@
-streamlit
-transformers
-torch
+streamlit>=1.33.0
+transformers>=4.40.0
+torch>=2.2.0
+numpy>=1.26.0
+plotly>=5.20.0
+scipy>=1.13.0
+sentencepiece>=0.2.0
+accelerate>=0.29.0
+datasets>=2.19.0

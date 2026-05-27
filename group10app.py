@@ -1,8 +1,3 @@
-# ============================================================
-# GamePulse AI: Gaming Community Sentiment Voice Reporter
-# app.py — Streamlit Application
-# ============================================================
-
 import streamlit as st
 import torch
 import numpy as np
@@ -10,120 +5,56 @@ import scipy.io.wavfile as wavfile
 import io
 import time
 import pandas as pd
-from transformers import (
-    AutoTokenizer,
-    AutoModelForSequenceClassification,
-    VitsModel,
-)
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, VitsModel
 
-# ------------------------------------------------------------
-# App Configuration
-# ------------------------------------------------------------
-
-st.set_page_config(
-    page_title="GamePulse AI",
-    page_icon="🎮",
-    layout="wide",
-)
-
-# ------------------------------------------------------------
-# Constants
-# ------------------------------------------------------------
+st.set_page_config(page_title="GamePulse AI", page_icon="🎮", layout="wide")
 
 SENTIMENT_MODEL_NAME = "zoeywww/cardiffnlp-sentiment-3class-finetuned"
-TTS_MODEL_NAME       = "kakao-enterprise/vits-ljs"
-
+TTS_MODEL_NAME = "kakao-enterprise/vits-ljs"
 ID2LABEL = {0: "Negative", 1: "Neutral", 2: "Positive"}
+LABEL_EMOJI = {"Positive": "✅", "Negative": "❌", "Neutral": "➖"}
 
-LABEL_EMOJI = {
-    "Positive": "✅",
-    "Negative": "❌",
-    "Neutral":  "➖",
-}
-
-# ------------------------------------------------------------
-# Business Logic
-# ------------------------------------------------------------
 
 def get_recommendation(counts, total):
     neg_pct = counts.get("Negative", 0) / total * 100
     pos_pct = counts.get("Positive", 0) / total * 100
-    neu_pct = counts.get("Neutral",  0) / total * 100
-
+    neu_pct = counts.get("Neutral", 0) / total * 100
     if neg_pct >= 40:
-        return (
-            "🚨 **Urgent Issue Review**: Negative feedback accounts for "
-            f"{neg_pct:.0f}% of comments. The community team should immediately "
-            "investigate player concerns before the next patch."
-        )
+        return "🚨 **Urgent Issue Review**: Negative feedback accounts for " + str(round(neg_pct)) + "% of comments. The community team should immediately investigate player concerns before the next patch."
     elif pos_pct >= 60:
-        return (
-            "🎉 **Healthy Community Response**: Positive feedback accounts for "
-            f"{pos_pct:.0f}% of comments. Consider featuring highlights in the "
-            "next community update or marketing summary."
-        )
+        return "🎉 **Healthy Community Response**: Positive feedback accounts for " + str(round(pos_pct)) + "% of comments. Consider featuring highlights in the next community update or marketing summary."
     elif neu_pct >= 60:
-        return (
-            "📊 **Monitor Normally**: Neutral feedback dominates at "
-            f"{neu_pct:.0f}%. No strong emotional reaction detected. "
-            "Continue regular monitoring."
-        )
+        return "📊 **Monitor Normally**: Neutral feedback dominates at " + str(round(neu_pct)) + "%. No strong emotional reaction detected. Continue regular monitoring."
     else:
         dominant = max(counts, key=counts.get)
-        return (
-            "📋 **Balanced / Mixed Reaction**: Community sentiment is distributed across "
-            "multiple categories. The dominant sentiment is "
-            f"**{dominant}** ({counts[dominant] / total * 100:.0f}%). "
-            "Review detailed comments for specific concerns."
-        )
+        dominant_pct = round(counts[dominant] / total * 100)
+        return "📋 **Balanced / Mixed Reaction**: Community sentiment is distributed across multiple categories. The dominant sentiment is **" + dominant + "** (" + str(dominant_pct) + "%). Review detailed comments for specific concerns."
 
 
 def generate_written_report(counts, total, dominant):
     neg_pct = counts.get("Negative", 0) / total * 100
     pos_pct = counts.get("Positive", 0) / total * 100
-    neu_pct = counts.get("Neutral",  0) / total * 100
-
+    neu_pct = counts.get("Neutral", 0) / total * 100
     if dominant == "Positive":
-        tone   = "mostly positive"
-        detail = (
-            f"Players are responding well, with {pos_pct:.0f}% positive feedback. "
-            "The community team may use these highlights for upcoming announcements."
-        )
+        tone = "mostly positive"
+        detail = "Players are responding well, with " + str(round(pos_pct)) + "% positive feedback. The community team may use these highlights for upcoming announcements."
     elif dominant == "Negative":
-        tone   = "predominantly negative"
-        detail = (
-            f"A significant {neg_pct:.0f}% of players expressed negative sentiment. "
-            "The product team should review reported issues before the next update."
-        )
+        tone = "predominantly negative"
+        detail = "A significant " + str(round(neg_pct)) + "% of players expressed negative sentiment. The product team should review reported issues before the next update."
     elif dominant == "Neutral":
-        tone   = "largely neutral"
-        detail = (
-            f"{neu_pct:.0f}% of feedback is neutral, suggesting no strong emotional reaction. "
-            "Standard monitoring is recommended at this time."
-        )
+        tone = "largely neutral"
+        detail = str(round(neu_pct)) + "% of feedback is neutral, suggesting no strong emotional reaction. Standard monitoring is recommended at this time."
     else:
-        tone   = "mixed"
-        detail = (
-            "Players have expressed a range of sentiments. "
-            "Both positive and negative points were raised across the community."
-        )
+        tone = "mixed"
+        detail = "Players have expressed a range of sentiments. Both positive and negative points were raised across the community."
+    comment_word = "comments" if total > 1 else "comment"
+    return "Community sentiment analysis is complete. Based on " + str(total) + " player " + comment_word + ", the overall community mood is " + tone + ". " + detail + " This report was generated by GamePulse AI for internal team review."
 
-    return (
-        f"Community sentiment analysis is complete. "
-        f"Based on {total} player comment{'s' if total > 1 else ''}, "
-        f"the overall community mood is {tone}. "
-        f"{detail} "
-        f"This report was generated by GamePulse AI for internal team review."
-    )
-
-# ------------------------------------------------------------
-# Model Loading (cached)
-# ------------------------------------------------------------
 
 @st.cache_resource(show_spinner="Loading sentiment model...")
 def load_sentiment_model():
     tokenizer = AutoTokenizer.from_pretrained(SENTIMENT_MODEL_NAME)
-    model     = AutoModelForSequenceClassification.from_pretrained(SENTIMENT_MODEL_NAME)
+    model = AutoModelForSequenceClassification.from_pretrained(SENTIMENT_MODEL_NAME)
     model.eval()
     return tokenizer, model
 
@@ -131,157 +62,102 @@ def load_sentiment_model():
 @st.cache_resource(show_spinner="Loading TTS model...")
 def load_tts_model():
     tts_tokenizer = AutoTokenizer.from_pretrained(TTS_MODEL_NAME)
-    tts_model     = VitsModel.from_pretrained(TTS_MODEL_NAME)
+    tts_model = VitsModel.from_pretrained(TTS_MODEL_NAME)
     tts_model.eval()
     return tts_tokenizer, tts_model
 
-# ------------------------------------------------------------
-# Pipeline 1: Sentiment Classification
-# ------------------------------------------------------------
 
 def classify_sentiment(texts, tokenizer, model):
-    results    = []
+    results = []
     start_time = time.time()
-
     for text in texts:
-        inputs = tokenizer(
-            text,
-            return_tensors="pt",
-            truncation=True,
-            max_length=128,
-            padding=True,
-        )
+        inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=128, padding=True)
         with torch.no_grad():
             outputs = model(**inputs)
-
-        probs      = torch.softmax(outputs.logits, dim=-1)[0].numpy()
-        pred_id    = int(np.argmax(probs))
-        label      = ID2LABEL[pred_id]
+        probs = torch.softmax(outputs.logits, dim=-1)[0].numpy()
+        pred_id = int(np.argmax(probs))
+        label = ID2LABEL[pred_id]
         confidence = float(probs[pred_id]) * 100
-
-        results.append({
-            "comment":    text,
-            "sentiment":  label,
-            "confidence": confidence,
-            "probs":      {ID2LABEL[i]: float(probs[i]) * 100 for i in range(len(probs))},
-        })
-
+        results.append({"comment": text, "sentiment": label, "confidence": confidence, "probs": {ID2LABEL[i]: float(probs[i]) * 100 for i in range(len(probs))}})
     runtime = time.time() - start_time
     return results, runtime
 
-# ------------------------------------------------------------
-# Pipeline 2: Text-to-Speech
-# ------------------------------------------------------------
 
 def generate_speech(text, tts_tokenizer, tts_model):
     start_time = time.time()
-
     inputs = tts_tokenizer(text, return_tensors="pt")
     with torch.no_grad():
         output = tts_model(**inputs)
-
-    waveform      = output.waveform[0].numpy()
+    waveform = output.waveform[0].numpy()
     sampling_rate = tts_model.config.sampling_rate
-
     waveform_int16 = (waveform * 32767).astype(np.int16)
-    buffer         = io.BytesIO()
+    buffer = io.BytesIO()
     wavfile.write(buffer, sampling_rate, waveform_int16)
-    audio_bytes    = buffer.getvalue()
-
+    audio_bytes = buffer.getvalue()
     runtime = time.time() - start_time
     return audio_bytes, runtime
 
-# ------------------------------------------------------------
-# UI — Header
-# ------------------------------------------------------------
 
+# --- Header ---
 st.title("🎮 GamePulse AI")
 st.subheader("Gaming Community Sentiment Voice Reporter")
-st.markdown(
-    "Analyse player feedback from gaming communities, generate a community sentiment report, "
-    "and listen to an AI-generated audio briefing — powered by fine-tuned NLP and TTS models."
-)
+st.markdown("Analyse player feedback from gaming communities, generate a community sentiment report, and listen to an AI-generated audio briefing powered by fine-tuned NLP and TTS models.")
 st.divider()
 
-# ------------------------------------------------------------
-# UI — Input Section
-# ------------------------------------------------------------
-
+# --- Input ---
 st.header("📝 Step 1: Enter Player Comments")
-st.markdown(
-    "Enter one or more player comments below. Use a **new line** to separate multiple comments."
-)
+st.markdown("Enter one or more player comments below. Use a **new line** to separate multiple comments.")
 
-default_comments = (
-    "The graphics update looks amazing, but the new matchmaking system is terrible.\n"
-    "I love the new event rewards.\n"
-    "The server lag makes ranked mode unplayable.\n"
-    "The patch is okay, nothing special."
-)
+default_lines = [
+    "The graphics update looks amazing, but the new matchmaking system is terrible.",
+    "I love the new event rewards.",
+    "The server lag makes ranked mode unplayable.",
+    "The patch is okay, nothing special.",
+]
+default_text = chr(10).join(default_lines)
 
-user_input = st.text_area(
-    label="Player Comments",
-    value=default_comments,
-    height=160,
-    placeholder="Enter player comments here, one per line...",
-)
-
+user_input = st.text_area(label="Player Comments", value=default_text, height=160, placeholder="Enter player comments here, one per line...")
 run_button = st.button("🚀 Analyse Comments", type="primary", use_container_width=True)
 
-# ------------------------------------------------------------
-# UI — Analysis
-# ------------------------------------------------------------
-
+# --- Analysis ---
 if run_button:
-    raw_comments = [c.strip() for c in user_input.strip().split("\n") if c.strip()]
+    raw_comments = [c.strip() for c in user_input.strip().split(chr(10)) if c.strip()]
 
     if len(raw_comments) == 0:
         st.warning("Please enter at least one comment before analysing.")
         st.stop()
 
     sent_tokenizer, sent_model = load_sentiment_model()
-    tts_tokenizer, tts_model   = load_tts_model()
-
-    # --------------------------------------------------------
-    # Pipeline 1
-    # --------------------------------------------------------
+    tts_tokenizer, tts_model = load_tts_model()
 
     st.divider()
     st.header("📊 Step 2: Sentiment Classification (Pipeline 1)")
 
     with st.spinner("Classifying player comments..."):
-        sentiment_results, p1_runtime = classify_sentiment(
-            raw_comments, sent_tokenizer, sent_model
-        )
+        sentiment_results, p1_runtime = classify_sentiment(raw_comments, sent_tokenizer, sent_model)
 
     st.markdown("**Individual Comment Results**")
     for i, res in enumerate(sentiment_results):
         col1, col2, col3 = st.columns([5, 2, 2])
         with col1:
-            st.markdown(f"**{i + 1}.** {res['comment']}")
+            st.markdown("**" + str(i + 1) + ".** " + res["comment"])
         with col2:
             emoji = LABEL_EMOJI.get(res["sentiment"], "")
-            st.markdown(f"{emoji} **{res['sentiment']}**")
+            st.markdown(emoji + " **" + res["sentiment"] + "**")
         with col3:
-            st.markdown(f"Confidence: **{res['confidence']:.1f}%**")
+            st.markdown("Confidence: **" + str(round(res["confidence"], 1)) + "%**")
 
-    st.caption(
-        f"⏱ Pipeline 1 runtime: {p1_runtime:.2f} seconds for {len(raw_comments)} comment(s)"
-    )
-
-    # --------------------------------------------------------
-    # Overall Sentiment Statistics
-    # --------------------------------------------------------
+    st.caption("⏱ Pipeline 1 runtime: " + str(round(p1_runtime, 2)) + " seconds for " + str(len(raw_comments)) + " comment(s)")
 
     st.divider()
     st.header("📈 Step 3: Overall Community Sentiment")
 
-    counts   = {}
+    counts = {}
     for res in sentiment_results:
-        label          = res["sentiment"]
-        counts[label]  = counts.get(label, 0) + 1
+        label = res["sentiment"]
+        counts[label] = counts.get(label, 0) + 1
 
-    total    = len(sentiment_results)
+    total = len(sentiment_results)
     dominant = max(counts, key=counts.get)
 
     col_stats, col_chart = st.columns(2)
@@ -290,12 +166,45 @@ if run_button:
         st.markdown("**Sentiment Distribution**")
         for label in ["Positive", "Negative", "Neutral"]:
             count = counts.get(label, 0)
-            pct   = count / total * 100
+            pct = count / total * 100
             emoji = LABEL_EMOJI.get(label, "")
-            st.markdown(f"{emoji} **{label}**: {count} comment(s) — {pct:.0f}%")
+            st.markdown(emoji + " **" + label + "**: " + str(count) + " comment(s) — " + str(round(pct)) + "%")
             st.progress(pct / 100)
 
     with col_chart:
-        chart_data = pd.DataFrame({
-            "Sentiment": list(counts.keys()),
- 
+        chart_labels = list(counts.keys())
+        chart_values = list(counts.values())
+        chart_df = pd.DataFrame({"Count": chart_values}, index=chart_labels)
+        st.bar_chart(chart_df)
+
+    st.divider()
+    st.header("💼 Step 4: Business Recommendation")
+    recommendation = get_recommendation(counts, total)
+    st.markdown(recommendation)
+
+    st.divider()
+    st.header("📄 Step 5: Written Community Report")
+    written_report = generate_written_report(counts, total, dominant)
+    st.info(written_report)
+
+    st.divider()
+    st.header("🔊 Step 6: Audio Community Briefing (Pipeline 2)")
+    st.markdown("The written report above will be converted into a spoken audio briefing using **" + TTS_MODEL_NAME + "**.")
+
+    with st.spinner("Generating audio briefing..."):
+        audio_bytes, p2_runtime = generate_speech(written_report, tts_tokenizer, tts_model)
+
+    st.audio(audio_bytes, format="audio/wav")
+    st.caption("⏱ Pipeline 2 runtime: " + str(round(p2_runtime, 2)) + " seconds")
+
+    st.divider()
+    st.header("⚡ Pipeline Runtime Summary")
+
+    col_p1, col_p2 = st.columns(2)
+    with col_p1:
+        st.metric(label="Pipeline 1 — Sentiment Classification", value=str(round(p1_runtime, 2)) + "s", help="Model: " + SENTIMENT_MODEL_NAME)
+    with col_p2:
+        st.metric(label="Pipeline 2 — Text-to-Speech", value=str(round(p2_runtime, 2)) + "s", help="Model: " + TTS_MODEL_NAME)
+
+st.divider()
+st.markdown("<div style='text-align:center; color:gray; font-size:0.85rem;'>GamePulse AI · ISOM5240 Group Project · Pipeline 1: zoeywww/cardiffnlp-sentiment-3class-finetuned · Pipeline 2: kakao-enterprise/vits-ljs</div>", unsafe_allow_html=True)

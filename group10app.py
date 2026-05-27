@@ -1,17 +1,3 @@
-import requests
-try:
-    r = requests.get("https://huggingface.co", timeout=10)
-    st.success("✅ Can reach HuggingFace: " + str(r.status_code))
-except Exception as e:
-    st.error("❌ Cannot reach HuggingFace: " + str(e))
-
-try:
-    from huggingface_hub import model_info
-    info = model_info("zoeywww/cardiffnlp-sentiment-3class-finetuned", token=st.secrets.get("HF_TOKEN"))
-    st.success("✅ Model found: " + info.modelId)
-except Exception as e:
-    st.error("❌ Model access error: " + str(e))
-    
 import streamlit as st
 import torch
 import numpy as np
@@ -19,6 +5,7 @@ import scipy.io.wavfile as wavfile
 import io
 import time
 import pandas as pd
+import requests
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, VitsModel
 from huggingface_hub import login
 
@@ -29,9 +16,42 @@ TTS_MODEL_NAME = "kakao-enterprise/vits-ljs"
 ID2LABEL = {0: "Negative", 1: "Neutral", 2: "Positive"}
 LABEL_EMOJI = {"Positive": "✅", "Negative": "❌", "Neutral": "➖"}
 
-# Authenticate with Hugging Face Hub using token from Streamlit secrets
+# Authenticate
 if "HF_TOKEN" in st.secrets:
     login(token=st.secrets["HF_TOKEN"])
+
+# --------------------------------------------------------
+# DIAGNOSTICS SECTION
+# --------------------------------------------------------
+with st.expander("🔍 System Diagnostics (expand to check)", expanded=True):
+    st.markdown("**Network & Model Access Check**")
+
+    try:
+        r = requests.get("https://huggingface.co", timeout=10)
+        st.success("✅ Can reach HuggingFace.co — status: " + str(r.status_code))
+    except Exception as e:
+        st.error("❌ Cannot reach HuggingFace.co: " + str(e))
+
+    try:
+        from huggingface_hub import model_info
+        info = model_info(SENTIMENT_MODEL_NAME, token=st.secrets.get("HF_TOKEN"))
+        st.success("✅ Sentiment model accessible: " + info.modelId)
+    except Exception as e:
+        st.error("❌ Sentiment model access error: " + str(e))
+
+    try:
+        from huggingface_hub import model_info
+        info2 = model_info(TTS_MODEL_NAME, token=st.secrets.get("HF_TOKEN"))
+        st.success("✅ TTS model accessible: " + info2.modelId)
+    except Exception as e:
+        st.error("❌ TTS model access error: " + str(e))
+
+    if "HF_TOKEN" in st.secrets:
+        st.info("🔑 HF_TOKEN is set in Streamlit secrets")
+    else:
+        st.warning("⚠️ HF_TOKEN not found in Streamlit secrets")
+
+# --------------------------------------------------------
 
 
 def get_recommendation(counts, total):
@@ -211,22 +231,4 @@ if run_button:
 
     st.divider()
     st.header("🔊 Step 6: Audio Community Briefing (Pipeline 2)")
-    st.markdown("The written report above will be converted into a spoken audio briefing using **" + TTS_MODEL_NAME + "**.")
-
-    with st.spinner("Generating audio briefing..."):
-        audio_bytes, p2_runtime = generate_speech(written_report, tts_tokenizer, tts_model)
-
-    st.audio(audio_bytes, format="audio/wav")
-    st.caption("⏱ Pipeline 2 runtime: " + str(round(p2_runtime, 2)) + " seconds")
-
-    st.divider()
-    st.header("⚡ Pipeline Runtime Summary")
-
-    col_p1, col_p2 = st.columns(2)
-    with col_p1:
-        st.metric(label="Pipeline 1 — Sentiment Classification", value=str(round(p1_runtime, 2)) + "s", help="Model: " + SENTIMENT_MODEL_NAME)
-    with col_p2:
-        st.metric(label="Pipeline 2 — Text-to-Speech", value=str(round(p2_runtime, 2)) + "s", help="Model: " + TTS_MODEL_NAME)
-
-st.divider()
-st.markdown("<div style='text-align:center; color:gray; font-size:0.85rem;'>GamePulse AI · ISOM5240 Group Project · Pipeline 1: zoeywww/cardiffnlp-sentiment-3class-finetuned · Pipeline 2: kakao-enterprise/vits-ljs</div>", unsafe_allow_html=True)
+    st.markdown("The written report abo

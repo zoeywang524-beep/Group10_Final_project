@@ -1,3 +1,17 @@
+import requests
+try:
+    r = requests.get("https://huggingface.co", timeout=10)
+    st.success("✅ Can reach HuggingFace: " + str(r.status_code))
+except Exception as e:
+    st.error("❌ Cannot reach HuggingFace: " + str(e))
+
+try:
+    from huggingface_hub import model_info
+    info = model_info("zoeywww/cardiffnlp-sentiment-3class-finetuned", token=st.secrets.get("HF_TOKEN"))
+    st.success("✅ Model found: " + info.modelId)
+except Exception as e:
+    st.error("❌ Model access error: " + str(e))
+    
 import streamlit as st
 import torch
 import numpy as np

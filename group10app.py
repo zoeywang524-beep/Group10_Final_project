@@ -6,6 +6,7 @@ import io
 import time
 import pandas as pd
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, VitsModel
+from huggingface_hub import login
 
 st.set_page_config(page_title="GamePulse AI", page_icon="🎮", layout="wide")
 
@@ -13,6 +14,10 @@ SENTIMENT_MODEL_NAME = "zoeywww/cardiffnlp-sentiment-3class-finetuned"
 TTS_MODEL_NAME = "kakao-enterprise/vits-ljs"
 ID2LABEL = {0: "Negative", 1: "Neutral", 2: "Positive"}
 LABEL_EMOJI = {"Positive": "✅", "Negative": "❌", "Neutral": "➖"}
+
+# Authenticate with Hugging Face Hub using token from Streamlit secrets
+if "HF_TOKEN" in st.secrets:
+    login(token=st.secrets["HF_TOKEN"])
 
 
 def get_recommendation(counts, total):
@@ -53,16 +58,20 @@ def generate_written_report(counts, total, dominant):
 
 @st.cache_resource(show_spinner="Loading sentiment model...")
 def load_sentiment_model():
-    tokenizer = AutoTokenizer.from_pretrained(SENTIMENT_MODEL_NAME)
-    model = AutoModelForSequenceClassification.from_pretrained(SENTIMENT_MODEL_NAME)
+    if "HF_TOKEN" in st.secrets:
+        login(token=st.secrets["HF_TOKEN"])
+    tokenizer = AutoTokenizer.from_pretrained(SENTIMENT_MODEL_NAME, token=st.secrets.get("HF_TOKEN"))
+    model = AutoModelForSequenceClassification.from_pretrained(SENTIMENT_MODEL_NAME, token=st.secrets.get("HF_TOKEN"))
     model.eval()
     return tokenizer, model
 
 
 @st.cache_resource(show_spinner="Loading TTS model...")
 def load_tts_model():
-    tts_tokenizer = AutoTokenizer.from_pretrained(TTS_MODEL_NAME)
-    tts_model = VitsModel.from_pretrained(TTS_MODEL_NAME)
+    if "HF_TOKEN" in st.secrets:
+        login(token=st.secrets["HF_TOKEN"])
+    tts_tokenizer = AutoTokenizer.from_pretrained(TTS_MODEL_NAME, token=st.secrets.get("HF_TOKEN"))
+    tts_model = VitsModel.from_pretrained(TTS_MODEL_NAME, token=st.secrets.get("HF_TOKEN"))
     tts_model.eval()
     return tts_tokenizer, tts_model
 
@@ -119,7 +128,6 @@ default_text = chr(10).join(default_lines)
 user_input = st.text_area(label="Player Comments", value=default_text, height=160, placeholder="Enter player comments here, one per line...")
 run_button = st.button("🚀 Analyse Comments", type="primary", use_container_width=True)
 
-# --- Analysis ---
 if run_button:
     raw_comments = [c.strip() for c in user_input.strip().split(chr(10)) if c.strip()]
 

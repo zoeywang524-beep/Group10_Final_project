@@ -1,9 +1,9 @@
-streamlit>=1.32.0
-transformers==4.40.0
-torch==2.2.2
+streamlit
+transformers
+torch
 scipy
 numpy
 pandas
-huggingface_hub>=0.22.0
+huggingface_hub
 sentencepiece
 protobuf

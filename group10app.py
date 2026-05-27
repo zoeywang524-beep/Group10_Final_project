@@ -11,7 +11,7 @@ from huggingface_hub import login
 
 st.set_page_config(page_title="GamePulse AI", page_icon="🎮", layout="wide")
 
-SENTIMENT_MODEL_NAME = "zoeywww/cardiffnlp-sentiment-3class-finetuned"
+SENTIMENT_MODEL_NAME = "zoeywwww/cardiffnlp-sentiment-3class-finetuned"
 TTS_MODEL_NAME = "kakao-enterprise/vits-ljs"
 ID2LABEL = {0: "Negative", 1: "Neutral", 2: "Positive"}
 LABEL_EMOJI = {"Positive": "✅", "Negative": "❌", "Neutral": "➖"}

@@ -219,4 +219,122 @@ with col_btn:
 with col_info:
     st.caption("Pipeline 1: Fine-tuned RoBERTa (3-class sentiment)  ·  Pipeline 2: VITS Text-to-Speech")
 
+st.divider()
+
+if run_button:
+    raw_comments = [c.strip() for c in user_input.strip().split("\n") if c.strip()]
+    if len(raw_comments) == 0:
+        st.warning("Please enter at least one comment.")
+        st.stop()
+
+    sent_tokenizer, sent_model = load_sentiment_model()
+    tts_tokenizer, tts_model = load_tts_model()
+
+    # Step 2
+    st.markdown("<div class='step-label'>📊 Step 2 — Sentiment Classification</div>", unsafe_allow_html=True)
+    st.caption("Model: " + SENTIMENT_MODEL_NAME)
+    with st.spinner("Classifying comments..."):
+        sentiment_results, p1_runtime = classify_sentiment(raw_comments, sent_tokenizer, sent_model)
+
+    for i, res in enumerate(sentiment_results):
+        color = LABEL_COLOR.get(res["sentiment"], "#58a6ff")
+        emoji = LABEL_EMOJI.get(res["sentiment"], "")
+        bar_pct = round(res["confidence"])
+        st.markdown(
+            "<div class='result-card'>"
+            "<div style='display:flex; justify-content:space-between; align-items:center;'>"
+            "<span style='color:#e0e0e0;'><b>" + str(i+1) + ".</b> " + res["comment"] + "</span>"
+            "<span style='color:" + color + "; font-weight:600; white-space:nowrap; margin-left:1rem;'>"
+            + emoji + " " + res["sentiment"] + " (" + str(bar_pct) + "%)</span>"
+            "</div></div>",
+            unsafe_allow_html=True)
+
+    st.caption("⏱ Classification runtime: " + str(round(p1_runtime, 3)) + "s for " + str(len(raw_comments)) + " comments")
+    st.divider()
+
+    # Step 3
+    st.markdown("<div class='step-label'>📈 Step 3 — Community Sentiment Overview</div>", unsafe_allow_html=True)
+    counts = {}
+    for res in sentiment_results:
+        lbl = res["sentiment"]
+        counts[lbl] = counts.get(lbl, 0) + 1
+    total = len(sentiment_results)
+    dominant = max(counts, key=counts.get)
+
+    col_stats, col_chart = st.columns([1, 1])
+    with col_stats:
+        for lbl in ["Positive", "Negative", "Neutral"]:
+            count = counts.get(lbl, 0)
+            pct = count / total * 100
+            color = LABEL_COLOR.get(lbl, "#58a6ff")
+            emoji = LABEL_EMOJI.get(lbl, "")
+            st.markdown(
+                "<div class='stat-row'>"
+                "<span style='width:90px; color:" + color + "; font-weight:600;'>" + emoji + " " + lbl + "</span>"
+                "<div style='flex:1; background:#21262d; border-radius:6px; height:10px;'>"
+                "<div style='width:" + str(round(pct)) + "%; background:" + color + "; height:10px; border-radius:6px;'></div>"
+                "</div>"
+                "<span style='width:60px; text-align:right; color:#8b949e;'>"
+                + str(count) + " (" + str(round(pct)) + "%)</span>"
+                "</div>",
+                unsafe_allow_html=True)
+    with col_chart:
+        chart_df = pd.DataFrame({"Count": list(counts.values())}, index=list(counts.keys()))
+        st.bar_chart(chart_df, color="#63caff")
+    st.divider()
+
+    # Step 4
+    st.markdown("<div class='step-label'>💼 Step 4 — Business Recommendation</div>", unsafe_allow_html=True)
+    rec_icon, rec_color, rec_title, rec_body = get_recommendation(counts, total)
+    st.markdown(
+        "<div class='rec-box' style='background:" + rec_color + "18; border:1px solid " + rec_color + "55;'>"
+        "<div style='font-weight:700; font-size:1rem; color:" + rec_color + "; margin-bottom:0.4rem;'>"
+        + rec_icon + " " + rec_title + "</div>"
+        "<div style='color:#c9d1d9;'>" + rec_body + "</div>"
+        "</div>",
+        unsafe_allow_html=True)
+    st.divider()
+
+    # Step 5
+    st.markdown("<div class='step-label'>📄 Step 5 — Written Community Report</div>", unsafe_allow_html=True)
+    written_report = generate_written_report(counts, total, dominant)
+    report_html = written_report.replace("\n", "<br>")
+    st.markdown("<div class='report-box'>" + report_html + "</div>", unsafe_allow_html=True)
+    st.divider()
+
+    # Step 6
+    st.markdown("<div class='step-label'>🔊 Step 6 — Audio Briefing (Pipeline 2)</div>", unsafe_allow_html=True)
+    st.caption("Model: " + TTS_MODEL_NAME + "  ·  Generating spoken version of the community report")
+    with st.spinner("Synthesising audio briefing..."):
+        audio_bytes, p2_runtime = generate_speech(written_report, tts_tokenizer, tts_model)
+    st.audio(audio_bytes, format="audio/wav")
+    st.caption("⏱ TTS runtime: " + str(round(p2_runtime, 2)) + "s")
+    st.divider()
+
+    # Runtime Summary
+    st.markdown("<div class='step-label'>⚡ Pipeline Runtime Summary</div>", unsafe_allow_html=True)
+    col_p1, col_p2 = st.columns(2)
+    with col_p1:
+        st.markdown(
+            "<div class='runtime-box'>"
+            "<div class='label'>Pipeline 1 · Sentiment Classification</div>"
+            "<div class='value'>" + str(round(p1_runtime, 3)) + "s</div>"
+            "<div style='color:#8b949e; font-size:0.78rem;'>" + SENTIMENT_MODEL_NAME + "</div>"
+            "</div>",
+            unsafe_allow_html=True)
+    with col_p2:
+        st.markdown(
+            "<div class='runtime-box'>"
+            "<div class='label'>Pipeline 2 · Text-to-Speech</div>"
+            "<div class='value'>" + str(round(p2_runtime, 2)) + "s</div>"
+            "<div style='color:#8b949e; font-size:0.78rem;'>" + TTS_MODEL_NAME + "</div>"
+            "</div>",
+            unsafe_allow_html=True)
+
+st.markdown("<br>", unsafe_allow_html=True)
+st.markdown(
+    "<div style='text-align:center; color:#484f58; font-size:0.78rem; padding:1rem 0;'>"
+    "GamePulse AI &nbsp;·&nbsp; ISOM5240 Group Project &nbsp;·&nbsp; "
+    "Pipeline 1: Fine-tuned RoBERTa &nbsp;·&nbsp; Pipeline 2: VITS TTS"
+    "</div>",
     unsafe_allow_html=True)

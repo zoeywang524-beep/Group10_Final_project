@@ -57,7 +57,7 @@ footer { visibility: hidden; }
 </style>
 """, unsafe_allow_html=True)
 
-SENTIMENT_MODEL_NAME = "zoeywww/cardiffnlp-sentiment-3class-finetuned"
+SENTIMENT_MODEL_NAME = "zoeywwww/cardiffnlp-sentiment-3class-finetuned"
 TTS_MODEL_NAME = "kakao-enterprise/vits-ljs"
 ID2LABEL = {0: "Negative", 1: "Neutral", 2: "Positive"}
 LABEL_EMOJI = {"Positive": "✅", "Negative": "🚨", "Neutral": "➖"}
